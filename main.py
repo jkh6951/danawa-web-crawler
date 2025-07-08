@@ -1,16 +1,9 @@
-# main.py
-"""
-FastAPI 다나와 크롤러 웹 서버
-"""
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Form, BackgroundTasks
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
-import asyncio
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -18,10 +11,10 @@ import time
 import random
 import re
 from urllib.parse import quote
-from typing import List, Dict, Any
+from typing import List
 
 # FastAPI 앱 생성
-app = FastAPI(title="다나와 프로 크롤러", description="실시간 상품 정보 수집 시스템")
+app = FastAPI(title="다나와 프로 크롤러")
 
 # 템플릿 설정
 templates = Jinja2Templates(directory="templates")
@@ -64,7 +57,7 @@ class DanawaWebCrawler:
             self.status = "시작"
             await self.notify_progress(f"'{keyword}' 검색을 시작합니다...")
             
-            # 1단계: 기본 정보 수집
+            # 기본 정보 수집
             basic_products = await self.collect_basic_info(keyword, max_pages)
             
             if not basic_products:
@@ -73,15 +66,11 @@ class DanawaWebCrawler:
                 return []
             
             self.total_items = len(basic_products)
-            
-            # 2단계: 상세 정보 수집
-            detailed_products = await self.collect_detailed_info(basic_products)
-            
             self.status = "완료"
-            self.results = detailed_products
-            await self.notify_progress(f"총 {len(detailed_products)}개 상품 수집 완료!")
+            self.results = basic_products
+            await self.notify_progress(f"총 {len(basic_products)}개 상품 수집 완료!")
             
-            return detailed_products
+            return basic_products
             
         except Exception as e:
             self.status = "오류"
@@ -95,7 +84,6 @@ class DanawaWebCrawler:
         for page in range(1, max_pages + 1):
             await self.notify_progress(f"{page}페이지 수집 중...")
             
-            # 실제 다나와 URL (사용자가 제공한 정확한 파라미터)
             url = f"https://search.danawa.com/dsearch.php?query={keyword}&sort=opinionDESC&list=list&boost=true&limit=40&mode=simple&page={page}"
             
             try:
@@ -112,8 +100,7 @@ class DanawaWebCrawler:
                 products.extend(page_products)
                 await self.notify_progress(f"{page}페이지: {len(page_products)}개 상품 발견")
                 
-                # 페이지 간 대기
-                await asyncio.sleep(random.uniform(1, 2))
+                time.sleep(random.uniform(1, 2))
                 
             except Exception as e:
                 await self.notify_progress(f"{page}페이지 오류: {str(e)}")
@@ -124,14 +111,7 @@ class DanawaWebCrawler:
     def extract_products_from_page(self, soup):
         """페이지에서 상품 정보 추출"""
         products = []
-        
-        # 상품 리스트 찾기
-        selectors = [
-            'ul.product_list li',
-            '.main_prodlist li',
-            '.prod_list li',
-            'li.prod_item'
-        ]
+        selectors = ['ul.product_list li', '.main_prodlist li', '.prod_list li', 'li.prod_item']
         
         items = []
         for selector in selectors:
@@ -146,20 +126,16 @@ class DanawaWebCrawler:
                     products.append(product)
             except:
                 continue
-        
+                
         return products
     
     def extract_single_product(self, item):
         """개별 상품 정보 추출"""
-        # 상품명
         name = self.get_product_name(item)
         if not name or len(name.strip()) < 3:
             return None
         
-        # 가격
         price = self.get_price(item)
-        
-        # URL
         product_url = self.get_product_url(item)
         
         if name and price > 0:
@@ -233,30 +209,6 @@ class DanawaWebCrawler:
             name = re.sub(pattern, '', name, flags=re.IGNORECASE)
         
         return re.sub(r'\s+', ' ', name).strip()
-    
-    async def collect_detailed_info(self, basic_products):
-        """상세 정보 수집 (간단 버전)"""
-        detailed_products = []
-        
-        for i, product in enumerate(basic_products, 1):
-            self.current_item = i
-            self.progress = int((i / len(basic_products)) * 100)
-            
-            await self.notify_progress(f"{i}/{len(basic_products)} - {product['name'][:30]}...")
-            
-            # 기본 정보에 간단한 추가 정보
-            product['crawled_at'] = datetime.now().isoformat()
-            product['rank'] = i
-            
-            detailed_products.append(product)
-            
-            # 진행률 업데이트
-            if i % 5 == 0:  # 5개마다 알림
-                await self.notify_progress(f"진행률: {self.progress}% ({i}/{len(basic_products)})")
-            
-            await asyncio.sleep(0.5)  # 짧은 대기
-        
-        return detailed_products
 
 # API 엔드포인트들
 @app.get("/", response_class=HTMLResponse)
@@ -264,16 +216,18 @@ async def read_root(request: Request):
     """메인 페이지"""
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/test")
+async def test():
+    return {"message": "서버가 살아있어요!", "status": "OK"}
+
 @app.post("/api/crawl/start")
 async def start_crawling(background_tasks: BackgroundTasks, keyword: str = Form(...), pages: int = Form(...)):
     """크롤링 시작"""
     job_id = str(uuid.uuid4())
     
-    # 크롤링 작업 생성
     crawler = DanawaWebCrawler(job_id)
     crawling_jobs[job_id] = crawler
     
-    # 백그라운드에서 크롤링 실행
     background_tasks.add_task(crawler.crawl_danawa, keyword, pages)
     
     return {"job_id": job_id, "status": "시작됨", "message": f"'{keyword}' 크롤링이 시작되었습니다."}
@@ -317,12 +271,11 @@ async def download_results(job_id: str, format: str = "csv"):
     crawler = crawling_jobs[job_id]
     
     if format == "csv":
-        # CSV 파일 생성
         filename = f"danawa_results_{job_id[:8]}.csv"
         
         with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
             if crawler.results:
-                fieldnames = ['rank', 'name', 'price', 'product_url', 'coupang_search_url', 'crawled_at']
+                fieldnames = ['name', 'price', 'product_url', 'coupang_search_url']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(crawler.results)
@@ -330,7 +283,6 @@ async def download_results(job_id: str, format: str = "csv"):
         return FileResponse(filename, filename=filename)
     
     elif format == "json":
-        # JSON 파일 생성
         filename = f"danawa_results_{job_id[:8]}.json"
         
         with open(filename, 'w', encoding='utf-8') as f:
@@ -340,7 +292,7 @@ async def download_results(job_id: str, format: str = "csv"):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket 연결 (실시간 진행상황)"""
+    """WebSocket 연결"""
     await websocket.accept()
     active_connections.append(websocket)
     
@@ -349,12 +301,3 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         active_connections.remove(websocket)
-
-# 서버 실행을 위한 코드
-    @app.get("/test")
-async def test():
-    return {"message": "서버가 살아있어요!"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
