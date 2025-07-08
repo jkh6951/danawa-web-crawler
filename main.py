@@ -211,10 +211,18 @@ class DanawaWebCrawler:
         return re.sub(r'\s+', ' ', name).strip()
 
 # API 엔드포인트들
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
+@app.get("/")
+async def read_root():
     """메인 페이지"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return {
+        "message": "🛒 다나와 크롤러가 작동 중입니다!", 
+        "status": "OK",
+        "endpoints": {
+            "크롤링 시작": "/api/crawl/start",
+            "테스트": "/test",
+            "API 문서": "/docs"
+        }
+    }
 
 @app.get("/test")
 async def test():
