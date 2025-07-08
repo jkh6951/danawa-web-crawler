@@ -351,9 +351,10 @@ async def websocket_endpoint(websocket: WebSocket):
         active_connections.remove(websocket)
 
 # 서버 실행을 위한 코드
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
     @app.get("/test")
 async def test():
     return {"message": "서버가 살아있어요!"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
