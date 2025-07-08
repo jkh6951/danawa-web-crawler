@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Form, BackgroundTasks
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse
 import json
 import uuid
@@ -15,9 +14,6 @@ from typing import List
 
 # FastAPI 앱 생성
 app = FastAPI(title="다나와 프로 크롤러")
-
-# 템플릿 설정
-templates = Jinja2Templates(directory="templates")
 
 # 크롤링 작업 상태 저장
 crawling_jobs = {}
@@ -210,19 +206,576 @@ class DanawaWebCrawler:
         
         return re.sub(r'\s+', ' ', name).strip()
 
-# API 엔드포인트들
-@app.get("/")
-async def read_root():
-    """메인 페이지"""
-    return {
-        "message": "🛒 다나와 크롤러가 작동 중입니다!", 
-        "status": "OK",
-        "endpoints": {
-            "크롤링 시작": "/api/crawl/start",
-            "테스트": "/test",
-            "API 문서": "/docs"
+# HTML 웹 인터페이스 (완전한 단일 파일)
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛒 다나와 프로 크롤러</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-    }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .search-form {
+            background: #f8f9ff;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 2px solid #e3e8ff;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 1.1em;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            align-items: end;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-panel {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .status-panel.show {
+            display: block;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .status-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .results-section {
+            background: #f9fafb;
+            border-radius: 15px;
+            padding: 30px;
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-download {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .results-table th {
+            background: #374151;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .results-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .results-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .price {
+            font-weight: 600;
+            color: #dc2626;
+        }
+
+        .rank {
+            background: #4facfe;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .product-name {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .link-btn {
+            background: #6366f1;
+            color: white;
+            text-decoration: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .link-btn:hover {
+            background: #4f46e5;
+        }
+
+        .coupang-btn {
+            background: #ff6b6b;
+        }
+
+        .coupang-btn:hover {
+            background: #ee5a5a;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #047857;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            border: 1px solid #dc2626;
+            color: #991b1b;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .download-buttons {
+                flex-direction: column;
+            }
+            
+            .results-table {
+                font-size: 0.9em;
+            }
+            
+            .results-table th,
+            .results-table td {
+                padding: 10px 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 다나와 프로 크롤러</h1>
+            <p>실시간 상품 정보 수집 시스템</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 검색 폼 -->
+            <div class="search-form">
+                <form id="crawlForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="keyword">🔍 검색할 상품명</label>
+                            <input type="text" id="keyword" name="keyword" placeholder="예: 의자, 책상, 모니터..." required>
+                        </div>
+                        <div class="form-group">
+                            <label for="pages">📖 페이지 수</label>
+                            <select id="pages" name="pages">
+                                <option value="1">1페이지</option>
+                                <option value="2">2페이지</option>
+                                <option value="3" selected>3페이지</option>
+                                <option value="4">4페이지</option>
+                                <option value="5">5페이지</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <button type="submit" class="btn-primary" id="startBtn">
+                            🚀 크롤링 시작
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 상태 패널 -->
+            <div class="status-panel" id="statusPanel">
+                <div class="status-header">
+                    <span class="status-icon">📊</span>
+                    <h3>크롤링 진행상황</h3>
+                </div>
+                <div id="statusMessage">준비 중...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div id="detailStatus"></div>
+            </div>
+
+            <!-- 결과 섹션 -->
+            <div class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <h3 class="results-title">📋 크롤링 결과</h3>
+                    <div class="download-buttons">
+                        <button class="btn-download" onclick="downloadResults('csv')">📊 CSV 다운로드</button>
+                        <button class="btn-download" onclick="downloadResults('json')">📄 JSON 다운로드</button>
+                    </div>
+                </div>
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let ws = null;
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateProgress(data);
+            };
+            
+            ws.onclose = function() {
+                setTimeout(connectWebSocket, 3000); // 재연결 시도
+            };
+        }
+
+        // 폼 제출 처리
+        document.getElementById('crawlForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('keyword', document.getElementById('keyword').value);
+            formData.append('pages', document.getElementById('pages').value);
+            
+            // UI 상태 변경
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').innerHTML = '<span class="loading"></span> 크롤링 중...';
+            document.getElementById('statusPanel').classList.add('show');
+            document.getElementById('resultsSection').classList.remove('show');
+            
+            try {
+                const response = await fetch('/api/crawl/start', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                currentJobId = result.job_id;
+                
+                document.getElementById('statusMessage').textContent = result.message;
+                
+            } catch (error) {
+                showAlert('크롤링 시작 중 오류가 발생했습니다: ' + error.message, 'error');
+                resetUI();
+            }
+        });
+
+        // 진행상황 업데이트
+        function updateProgress(data) {
+            if (data.job_id !== currentJobId) return;
+            
+            const progressFill = document.getElementById('progressFill');
+            const statusMessage = document.getElementById('statusMessage');
+            const detailStatus = document.getElementById('detailStatus');
+            
+            progressFill.style.width = data.progress + '%';
+            progressFill.textContent = data.progress + '%';
+            statusMessage.textContent = data.message;
+            
+            if (data.total_items > 0) {
+                detailStatus.textContent = `${data.current_item}/${data.total_items} 상품 처리 완료`;
+            }
+            
+            // 완료 시 결과 로드
+            if (data.status === '완료') {
+                loadResults();
+                resetUI();
+                showAlert('크롤링이 성공적으로 완료되었습니다!', 'success');
+            } else if (data.status === '실패' || data.status === '오류') {
+                resetUI();
+                showAlert('크롤링 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 결과 로드
+        async function loadResults() {
+            if (!currentJobId) return;
+            
+            try {
+                const response = await fetch(`/api/crawl/results/${currentJobId}`);
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    displayResults(data.results);
+                    document.getElementById('resultsSection').classList.add('show');
+                }
+            } catch (error) {
+                showAlert('결과를 불러오는 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 결과 표시
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            
+            let html = `
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>순위</th>
+                            <th>상품명</th>
+                            <th>가격</th>
+                            <th>다나와</th>
+                            <th>쿠팡검색</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            results.forEach((product, index) => {
+                html += `
+                    <tr>
+                        <td><span class="rank">${index + 1}</span></td>
+                        <td class="product-name" title="${product.name}">${product.name}</td>
+                        <td class="price">${product.price.toLocaleString()}원</td>
+                        <td>
+                            ${product.product_url ? 
+                                `<a href="${product.product_url}" target="_blank" class="link-btn">다나와</a>` : 
+                                '-'}
+                        </td>
+                        <td>
+                            <a href="${product.coupang_search_url}" target="_blank" class="link-btn coupang-btn">쿠팡</a>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // 결과 다운로드
+        async function downloadResults(format) {
+            if (!currentJobId) return;
+            
+            const url = `/api/crawl/download/${currentJobId}?format=${format}`;
+            window.open(url, '_blank');
+        }
+
+        // UI 리셋
+        function resetUI() {
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').innerHTML = '🚀 크롤링 시작';
+        }
+
+        // 알림 표시
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            const mainContent = document.querySelector('.main-content');
+            mainContent.insertBefore(alertDiv, mainContent.firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // 페이지 로드 시 WebSocket 연결
+        window.addEventListener('load', function() {
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>
+"""
+
+# API 엔드포인트들
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    """메인 페이지 - 완전한 웹 인터페이스"""
+    return HTMLResponse(content=HTML_TEMPLATE)
 
 @app.get("/test")
 async def test():
