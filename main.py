@@ -23,8 +23,19 @@ class DanawaWebCrawler:
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.session = requests.Session()
+        # 더 정교한 브라우저 헤더로 봇 차단 우회
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
         })
         self.status = "준비중"
         self.progress = 0
@@ -74,53 +85,108 @@ class DanawaWebCrawler:
             return []
     
     async def collect_basic_info(self, keyword: str, max_pages: int):
-        """기본 상품 정보 수집"""
+        """기본 상품 정보 수집 - 개선된 버전"""
         products = []
         
         for page in range(1, max_pages + 1):
-            await self.notify_progress(f"{page}페이지 수집 중...")
+            await self.notify_progress(f"🌐 {page}페이지 접속 준비 중...")
             
-            url = f"https://search.danawa.com/dsearch.php?query={keyword}&sort=opinionDESC&list=list&boost=true&limit=40&mode=simple&page={page}"
+            # URL 인코딩 개선
+            encoded_keyword = quote(keyword.encode('utf-8'))
+            url = f"https://search.danawa.com/dsearch.php?query={encoded_keyword}&sort=opinionDESC&list=list&boost=true&limit=40&mode=simple&page={page}"
             
             try:
-                response = self.session.get(url, timeout=15)
+                await self.notify_progress(f"📡 {page}페이지 요청 중...")
+                
+                # 더 긴 타임아웃과 재시도
+                response = self.session.get(url, timeout=20)
+                
+                await self.notify_progress(f"📨 응답 수신: {response.status_code}")
+                
+                if response.status_code != 200:
+                    await self.notify_progress(f"❌ HTTP 오류: {response.status_code}")
+                    continue
+                
                 response.raise_for_status()
                 
+                await self.notify_progress(f"🔍 HTML 내용 분석 중...")
+                
+                # HTML 내용 길이 확인
+                html_length = len(response.text)
+                await self.notify_progress(f"📄 HTML 크기: {html_length:,} 바이트")
+                
+                if html_length < 1000:
+                    await self.notify_progress(f"⚠️ HTML이 너무 작음 - 차단되었을 가능성")
+                    continue
+                
                 soup = BeautifulSoup(response.text, 'html.parser')
+                
+                await self.notify_progress(f"🎯 상품 정보 추출 중...")
                 page_products = self.extract_products_from_page(soup)
                 
                 if not page_products:
-                    await self.notify_progress(f"{page}페이지에서 상품을 찾을 수 없습니다.")
+                    await self.notify_progress(f"❌ {page}페이지에서 상품을 찾을 수 없습니다.")
+                    # HTML 구조 확인을 위한 디버깅
+                    title = soup.find('title')
+                    if title:
+                        await self.notify_progress(f"📰 페이지 제목: {title.get_text()[:50]}")
                     break
                 
                 products.extend(page_products)
-                await self.notify_progress(f"{page}페이지: {len(page_products)}개 상품 발견")
+                await self.notify_progress(f"✅ {page}페이지: {len(page_products)}개 상품 발견")
                 
-                time.sleep(random.uniform(1, 2))
+                # 페이지 간 더 긴 대기 (봇 차단 방지)
+                if page < max_pages:
+                    await self.notify_progress(f"⏱️ 다음 페이지 대기 중...")
+                    time.sleep(random.uniform(3, 6))
                 
             except Exception as e:
-                await self.notify_progress(f"{page}페이지 오류: {str(e)}")
+                await self.notify_progress(f"💥 {page}페이지 오류: {str(e)}")
                 break
         
         return products
     
     def extract_products_from_page(self, soup):
-        """페이지에서 상품 정보 추출"""
+        """페이지에서 상품 정보 추출 - 디버깅 강화"""
         products = []
-        selectors = ['ul.product_list li', '.main_prodlist li', '.prod_list li', 'li.prod_item']
+        
+        # 다양한 선택자로 상품 리스트 찾기
+        selectors = [
+            'ul.product_list li',
+            '.main_prodlist li', 
+            '.prod_list li',
+            'li.prod_item',
+            '.item_wrap',
+            '.product_item'
+        ]
         
         items = []
+        used_selector = ""
+        
         for selector in selectors:
             items = soup.select(selector)
             if items:
+                used_selector = selector
                 break
         
-        for item in items:
+        print(f"디버깅: 사용된 선택자 '{used_selector}', 찾은 항목 수: {len(items)}")
+        
+        if not items:
+            # 페이지 구조 분석
+            all_li = soup.select('li')
+            all_div = soup.select('div')
+            print(f"디버깅: 전체 li 태그 수: {len(all_li)}, div 태그 수: {len(all_div)}")
+            return products
+        
+        for i, item in enumerate(items[:50]):  # 최대 50개만 처리
             try:
                 product = self.extract_single_product(item)
                 if product:
                     products.append(product)
-            except:
+                    if len(products) >= 40:  # 페이지당 40개 제한
+                        break
+            except Exception as e:
+                print(f"디버깅: {i}번째 아이템 처리 오류: {e}")
                 continue
                 
         return products
@@ -145,35 +211,79 @@ class DanawaWebCrawler:
         return None
     
     def get_product_name(self, item):
-        """상품명 추출"""
-        selectors = ['p.prod_name a', 'dt.prod_name a', 'div.prod_name a', 'a.prod_name', '.prod_name a']
+        """상품명 추출 - 강화된 버전"""
+        selectors = [
+            'p.prod_name a',
+            'dt.prod_name a', 
+            'div.prod_name a',
+            'a.prod_name',
+            '.prod_name a',
+            'a[title]',
+            '.item_name a',
+            '.product_name a',
+            'h3 a',
+            'h4 a'
+        ]
         
         for selector in selectors:
             elem = item.select_one(selector)
             if elem:
+                # 텍스트 우선
                 text = elem.get_text(strip=True)
                 if text and len(text) > 3:
                     return self.clean_name(text)
                 
+                # title 속성 확인
                 title = elem.get('title', '').strip()
                 if title and len(title) > 3:
                     return self.clean_name(title)
         
+        # 추가 시도: 모든 a 태그 확인
+        all_links = item.select('a')
+        for link in all_links:
+            text = link.get_text(strip=True)
+            if text and len(text) > 10 and '원' not in text:  # 가격이 아닌 것들만
+                return self.clean_name(text)
+        
         return None
     
     def get_price(self, item):
-        """가격 추출"""
-        selectors = ['strong.num', 'em.num_c', '.price strong', 'span.price', '.price_sect strong']
+        """가격 추출 - 강화된 버전"""
+        selectors = [
+            'strong.num',
+            'em.num_c', 
+            '.price strong',
+            'span.price',
+            '.price_sect strong',
+            '.item_price strong',
+            '.product_price strong',
+            '.price .num',
+            'em[class*="price"]',
+            'span[class*="price"]'
+        ]
         
         for selector in selectors:
             elem = item.select_one(selector)
             if elem:
                 price_text = re.sub(r'[^\d]', '', elem.get_text())
-                if price_text:
+                if price_text and len(price_text) >= 3:  # 최소 3자리 이상
                     try:
-                        return int(price_text)
+                        price = int(price_text)
+                        if 1000 <= price <= 10000000:  # 1천원~1천만원 범위
+                            return price
                     except:
                         continue
+        
+        # 추가 시도: 원이 포함된 텍스트 찾기
+        text_content = item.get_text()
+        price_matches = re.findall(r'([\d,]+)\s*원', text_content)
+        for match in price_matches:
+            try:
+                price = int(match.replace(',', ''))
+                if 1000 <= price <= 10000000:
+                    return price
+            except:
+                continue
         
         return 0
     
