@@ -289,7 +289,11 @@ class DanawaWebCrawler:
     
     def get_product_url(self, item):
         """상품 URL 추출"""
-        selectors = ['p.prod_name a', 'dt.prod_name a', 'a.prod_name']
+        selectors = [
+            'p.prod_name a',
+            'dt.prod_name a',
+            'a.prod_name'
+        ]
         
         for selector in selectors:
             elem = item.select_one(selector)
@@ -316,7 +320,7 @@ class DanawaWebCrawler:
         
         return re.sub(r'\s+', ' ', name).strip()
 
-# HTML 웹 인터페이스 (완전한 단일 파일)
+# HTML 웹 인터페이스 (모바일 최적화)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -335,7 +339,7 @@ HTML_TEMPLATE = """
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
 
         .container {
@@ -349,36 +353,36 @@ HTML_TEMPLATE = """
 
         .header {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            padding: 30px;
+            padding: 20px;
             text-align: center;
             color: white;
         }
 
         .header h1 {
-            font-size: 2.5em;
+            font-size: 2em;
             margin-bottom: 10px;
             font-weight: 700;
         }
 
         .header p {
-            font-size: 1.2em;
+            font-size: 1em;
             opacity: 0.9;
         }
 
         .main-content {
-            padding: 40px;
+            padding: 20px;
         }
 
         .search-form {
             background: #f8f9ff;
-            padding: 30px;
+            padding: 20px;
             border-radius: 15px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border: 2px solid #e3e8ff;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .form-group label {
@@ -386,15 +390,15 @@ HTML_TEMPLATE = """
             margin-bottom: 8px;
             font-weight: 600;
             color: #374151;
-            font-size: 1.1em;
+            font-size: 1em;
         }
 
         .form-group input, .form-group select {
             width: 100%;
-            padding: 15px;
+            padding: 12px;
             border: 2px solid #d1d5db;
             border-radius: 10px;
-            font-size: 1.1em;
+            font-size: 1em;
             transition: all 0.3s ease;
         }
 
@@ -407,7 +411,7 @@ HTML_TEMPLATE = """
         .form-row {
             display: grid;
             grid-template-columns: 2fr 1fr;
-            gap: 20px;
+            gap: 15px;
             align-items: end;
         }
 
@@ -415,9 +419,9 @@ HTML_TEMPLATE = """
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
             border: none;
-            padding: 15px 30px;
+            padding: 12px 20px;
             border-radius: 10px;
-            font-size: 1.2em;
+            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -439,8 +443,8 @@ HTML_TEMPLATE = """
             background: #f0f9ff;
             border: 2px solid #0ea5e9;
             border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
+            padding: 20px;
+            margin-bottom: 20px;
             display: none;
         }
 
@@ -455,15 +459,15 @@ HTML_TEMPLATE = """
         }
 
         .status-icon {
-            font-size: 1.5em;
+            font-size: 1.2em;
             margin-right: 10px;
         }
 
         .progress-bar {
             width: 100%;
-            height: 25px;
+            height: 20px;
             background: #e5e7eb;
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
             margin: 15px 0;
         }
@@ -478,12 +482,13 @@ HTML_TEMPLATE = """
             justify-content: center;
             color: white;
             font-weight: 600;
+            font-size: 0.9em;
         }
 
         .results-section {
             background: #f9fafb;
             border-radius: 15px;
-            padding: 30px;
+            padding: 20px;
             display: none;
         }
 
@@ -495,29 +500,33 @@ HTML_TEMPLATE = """
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .results-title {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: 600;
             color: #1f2937;
         }
 
         .download-buttons {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .btn-download {
             background: #10b981;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 15px;
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            font-size: 0.9em;
         }
 
         .btn-download:hover {
@@ -537,14 +546,16 @@ HTML_TEMPLATE = """
         .results-table th {
             background: #374151;
             color: white;
-            padding: 15px;
+            padding: 12px 8px;
             text-align: left;
             font-weight: 600;
+            font-size: 0.9em;
         }
 
         .results-table td {
-            padding: 15px;
+            padding: 12px 8px;
             border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9em;
         }
 
         .results-table tr:hover {
@@ -559,28 +570,31 @@ HTML_TEMPLATE = """
         .rank {
             background: #4facfe;
             color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
+            padding: 4px 8px;
+            border-radius: 15px;
             font-weight: 600;
             text-align: center;
+            font-size: 0.8em;
         }
 
         .product-name {
-            max-width: 300px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            max-width: 250px;
+            line-height: 1.3;
         }
 
         .link-btn {
             background: #6366f1;
             color: white;
             text-decoration: none;
-            padding: 5px 15px;
+            padding: 4px 10px;
             border-radius: 5px;
-            font-size: 0.9em;
+            font-size: 0.8em;
             font-weight: 500;
             transition: all 0.3s ease;
+            display: inline-block;
         }
 
         .link-btn:hover {
@@ -597,10 +611,10 @@ HTML_TEMPLATE = """
 
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #4facfe;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #4facfe;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -611,9 +625,10 @@ HTML_TEMPLATE = """
         }
 
         .alert {
-            padding: 15px;
+            padding: 12px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
         }
 
         .alert-success {
@@ -628,22 +643,129 @@ HTML_TEMPLATE = """
             color: #991b1b;
         }
 
+        /* 모바일 최적화 */
         @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .container {
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .main-content {
+                padding: 15px;
+            }
+            
+            .search-form {
+                padding: 15px;
+            }
+            
             .form-row {
                 grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .results-header {
+                flex-direction: column;
+                align-items: stretch;
             }
             
             .download-buttons {
-                flex-direction: column;
+                justify-content: center;
+            }
+            
+            /* 모바일에서 상품명 여러 줄 표시 */
+            .product-name {
+                white-space: normal;
+                text-overflow: unset;
+                max-width: none;
+                line-height: 1.4;
+                word-break: break-word;
+                padding: 8px 4px;
             }
             
             .results-table {
-                font-size: 0.9em;
+                font-size: 0.8em;
             }
             
             .results-table th,
             .results-table td {
-                padding: 10px 5px;
+                padding: 8px 4px;
+            }
+            
+            .results-table th {
+                font-size: 0.8em;
+            }
+            
+            .rank {
+                padding: 3px 6px;
+                font-size: 0.7em;
+            }
+            
+            .link-btn {
+                padding: 3px 8px;
+                font-size: 0.7em;
+                margin: 1px;
+            }
+            
+            /* 모바일에서 테이블 열 너비 조정 */
+            .results-table th:nth-child(1),
+            .results-table td:nth-child(1) {
+                width: 60px;
+                text-align: center;
+            }
+            
+            .results-table th:nth-child(2),
+            .results-table td:nth-child(2) {
+                width: auto;
+                min-width: 150px;
+            }
+            
+            .results-table th:nth-child(3),
+            .results-table td:nth-child(3) {
+                width: 80px;
+            }
+            
+            .results-table th:nth-child(4),
+            .results-table td:nth-child(4),
+            .results-table th:nth-child(5),
+            .results-table td:nth-child(5) {
+                width: 60px;
+                text-align: center;
+            }
+        }
+
+        /* 초소형 모바일 (320px 이하) */
+        @media (max-width: 380px) {
+            .header h1 {
+                font-size: 1.3em;
+            }
+            
+            .results-table {
+                font-size: 0.75em;
+            }
+            
+            .results-table th,
+            .results-table td {
+                padding: 6px 2px;
+            }
+            
+            .product-name {
+                font-size: 0.85em;
+            }
+            
+            .link-btn {
+                font-size: 0.65em;
+                padding: 2px 6px;
             }
         }
     </style>
@@ -675,7 +797,7 @@ HTML_TEMPLATE = """
                             </select>
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top: 20px;">
+                    <div class="form-group" style="margin-top: 15px;">
                         <button type="submit" class="btn-primary" id="startBtn">
                             🚀 크롤링 시작
                         </button>
@@ -701,8 +823,8 @@ HTML_TEMPLATE = """
                 <div class="results-header">
                     <h3 class="results-title">📋 크롤링 결과</h3>
                     <div class="download-buttons">
-                        <button class="btn-download" onclick="downloadResults('csv')">📊 CSV 다운로드</button>
-                        <button class="btn-download" onclick="downloadResults('json')">📄 JSON 다운로드</button>
+                        <button class="btn-download" onclick="downloadResults('csv')">📊 CSV</button>
+                        <button class="btn-download" onclick="downloadResults('json')">📄 JSON</button>
                     </div>
                 </div>
                 <div id="resultsContainer"></div>
@@ -816,7 +938,7 @@ HTML_TEMPLATE = """
                             <th>상품명</th>
                             <th>가격</th>
                             <th>다나와</th>
-                            <th>쿠팡검색</th>
+                            <th>쿠팡</th>
                         </tr>
                     </thead>
                     <tbody>
